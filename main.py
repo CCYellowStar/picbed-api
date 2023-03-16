@@ -1,10 +1,16 @@
 from flask import Flask, render_template, request, jsonify
-from replit import db
+import sqlite3
 import requests
 import random
 
 app = Flask(__name__)
 
+# Connect to the MySQL database
+conn = sqlite3.connect("my_emojis")
+cursor = conn.cursor()
+cursor.execute('''SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='emojis' ''')
+if cursor.fetchone()[0] == 0:
+    cursor.execute('''CREATE TABLE emojis (tag text, url text)''')
 
 @app.route('/')
 def index():
@@ -14,6 +20,8 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
   success = False
+  conn = sqlite3.connect('my_emojis')
+  cursor = conn.cursor()
   data = request.get_json()
   for da in data:
     pic = da['base64']
@@ -30,16 +38,13 @@ def upload():
                           headers=headers,
                           data=d)
       txt = res.text
-      q = db.prefix(tag)
-      if not q:
-        db[tag] = txt
-      else:
-        db[tag + str(len(db.prefix(tag)))] = txt
+      cursor.execute("INSERT INTO emojis (tag, url) VALUES (?, ?)", (tag, txt))
       success = True
     except:
       success = False
       pass
-
+  conn.commit()
+  conn.close()
   message = '上传成功！' if success else '上传失败，请重试！'
   print(message)
   return jsonify({'success': success, 'message': message})
@@ -47,14 +52,20 @@ def upload():
 
 @app.route('/<keyword>')
 def emoji(keyword):
-  q = db.prefix(keyword)
-  if q:
-    res = db[db.prefix(keyword)[random.randint(0,
-                                               len(db.prefix(keyword)) - 1)]]
+  conn = sqlite3.connect('my_emojis')
+  cursor = conn.cursor()
+  cursor.execute("SELECT * FROM emojis WHERE tag LIKE ?", ('%' + keyword + '%', ))
+  result = cursor.fetchall()
+  if len(result) > 0:
+    res = result[random.randint(0, len(result) - 1)][1]
+    conn.close()
     return res
   else:
-    # 如果没有找到对应的表情包，则从指定范围内返回一张随机表情包，并将该关键字单独存储记录下来以便人工添加。
-    return db[random.sample(db.keys(), 1)[0]]
+    cursor.execute("SELECT * FROM emojis")
+    data = cursor.fetchall()
+    conn.close()
+    return data[random.randint(0, len(data) - 1)][1]
 
 
-app.run(host='0.0.0.0', port=81)
+if __name__ == '__main__':
+  app.run(host='0.0.0.0', port=81)

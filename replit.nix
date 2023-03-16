@@ -1,5 +1,6 @@
 { pkgs }: {
   deps = [
+    pkgs.mysql80
     pkgs.python310Full
     pkgs.replitPackages.prybar-python310
     pkgs.replitPackages.stderred
