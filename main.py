@@ -1,20 +1,57 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
 import sqlite3
 import requests
 import random
-
-app = Flask(__name__)
-
+from datetime import datetime
+from flask_cors import CORS
+app = Flask(__name__, static_folder='static',template_folder='static',static_url_path='/static')
+CORS(app, resources=r'/*')
 # Connect to the MySQL database
 conn = sqlite3.connect("my_emojis")
 cursor = conn.cursor()
 cursor.execute('''SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='emojis' ''')
 if cursor.fetchone()[0] == 0:
-    cursor.execute('''CREATE TABLE emojis (tag text, url text)''')
+  cursor.execute('''
+      CREATE TABLE emojis (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          url TEXT NOT NULL,
+          upload_time TEXT NOT NULL,
+          uploader TEXT NOT NULL
+      )
+  ''')
+  cursor.execute('''
+      CREATE TABLE tags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          emoji_count INTEGER NOT NULL DEFAULT 0,
+          search_count INTEGER NOT NULL DEFAULT 0
+      )
+  ''')
+  cursor.execute('''
+      CREATE TABLE emoji_tag (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          emoji_id INTEGER NOT NULL,
+          tag_id INTEGER NOT NULL,
+          FOREIGN KEY (emoji_id) REFERENCES emojis (id),
+          FOREIGN KEY (tag_id) REFERENCES tags (id)
+      );
+  ''')
+  cursor.execute('''
+    CREATE TABLE submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        submitter TEXT NOT NULL,
+        submission_date TEXT NOT NULL,
+        status INTEGER NOT NULL DEFAULT 0
+    )
+''')
+
+
 
 @app.route('/')
 def index():
-  return render_template('index.html')
+  return
 
 
 @app.route('/upload', methods=['POST'])
@@ -25,7 +62,9 @@ def upload():
   data = request.get_json()
   for da in data:
     pic = da['base64']
-    tag = da['name']
+    tags = da['name']
+    uploader=da['uploadername']
+    tag_str = ",".join(tags)
     headers = {
       'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.63',
@@ -37,8 +76,18 @@ def upload():
       res = requests.post("https://imgloc.com/api/1/upload",
                           headers=headers,
                           data=d)
-      txt = res.text
-      cursor.execute("INSERT INTO emojis (tag, url) VALUES (?, ?)", (tag, txt))
+      url = res.text
+      upload_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      cursor.execute("INSERT INTO submissions (url,tag, submitter, submission_date,status) VALUES (?, ?, ?, ?, ?)", (url, tag_str,uploader,upload_time,0))
+      """
+      for tag in tags:
+        cursor.execute("SELECT * FROM tags WHERE tags = ?", (tag, ))
+        result = cursor.fetchall()
+        if result is not None:
+          tag_id = result[0]
+          emoji_count = result[2]
+          cursor.execute("UPDATE tags SET emoji_count = ? WHERE id = ?", (emoji_count + 1, tag_id))"""
+      conn.commit()
       success = True
     except:
       success = False
@@ -50,22 +99,59 @@ def upload():
   return jsonify({'success': success, 'message': message})
 
 
-@app.route('/<keyword>')
+@app.route('/random_emotic', methods=['POST'])
+@app.route('/random_emotic/<keyword>', methods=['GET'])
 def emoji(keyword):
   conn = sqlite3.connect('my_emojis')
   cursor = conn.cursor()
-  cursor.execute("SELECT * FROM emojis WHERE tag LIKE ?", ('%' + keyword + '%', ))
-  result = cursor.fetchall()
-  if len(result) > 0:
-    res = result[random.randint(0, len(result) - 1)][1]
-    conn.close()
-    return res
-  else:
-    cursor.execute("SELECT * FROM emojis")
-    data = cursor.fetchall()
-    conn.close()
-    return data[random.randint(0, len(data) - 1)][1]
+  if request.method == 'GET':
+    cursor.execute("SELECT * FROM tags WHERE name = ?", (keyword , ))
+    result = cursor.fetchall()
+    if len(result) > 0:
+      tag_id = result[0]
+      cursor.execute("SELECT * FROM emoji_tag WHERE tag_id = ?", (tag_id , ))
+      result1 = cursor.fetchall()
+      if len(result1) > 0:
+        emoji_id = result1[random.randint(0, len(result1) - 1)][1]
+        url=cursor.execute("SELECT * FROM emojis WHERE id = ?", (emoji_id , )).fetchall()[0][1]
+        conn.close()
+        return url
+      else:
+        cursor.execute("SELECT * FROM emojis")
+        data = cursor.fetchall()
+        conn.close()
+        return data[random.randint(0, len(data) - 1)][1]
+    else:
+      cursor.execute("SELECT * FROM emojis")
+      data = cursor.fetchall()
+      conn.close()
+      return data[random.randint(0, len(data) - 1)][1]
 
-
+  if request.method == 'POST': #再解决屏蔽词
+    data = request.get_json()
+    keyword=data['keyword']
+    blocked_tags=data['forbidden_tag']
+    cursor.execute("SELECT * FROM tags WHERE name = ?", (keyword , ))
+    result = cursor.fetchall()
+    if len(result) > 0:
+      tag_id = result[0]
+      cursor.execute("SELECT * FROM emoji_tag WHERE tag_id = ?", (tag_id , ))
+      result1 = cursor.fetchall()
+      if len(result1) > 0:
+        emoji_id = result1[random.randint(0, len(result1) - 1)][1]
+        url=cursor.execute("SELECT * FROM emojis WHERE id = ?", (emoji_id , )).fetchall()[0][1]
+        conn.close()
+        return url
+      else:
+        cursor.execute("SELECT * FROM emojis")
+        data = cursor.fetchall()
+        conn.close()
+        return data[random.randint(0, len(data) - 1)][1]
+    else:
+      cursor.execute("SELECT * FROM emojis")
+      data = cursor.fetchall()
+      conn.close()
+      return data[random.randint(0, len(data) - 1)][1]
+    
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=81)
