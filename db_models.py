@@ -9,7 +9,7 @@ class Emojis(Model):
     uploader = fields.CharField(max_length=255)
   
     class Meta:
-        table =  f"{__name__}.emojis"
+        table =  "emojis"
 
 class Tags(Model):
     id = fields.IntField(pk=True)
@@ -18,15 +18,15 @@ class Tags(Model):
     search_count = fields.IntField(default=0)
   
     class Meta:
-        table =  f"{__name__}.tags"
+        table =  "tags"
 
 class EmojiTag(Model):
     id = fields.IntField(pk=True)
-    emoji = fields.ForeignKeyField('models.Emojis', related_name='emoji_tag')
-    tag = fields.ForeignKeyField('models.Tags', related_name='emoji_tag')
+    emoji_id = fields.ForeignKeyField('models.Emojis', related_name='emoji_tag')
+    tag_id = fields.ForeignKeyField('models.Tags', related_name='emoji_tag')
   
     class Meta:
-        table =  f"{__name__}.emoji_tag"
+        table =  "emoji_tag"
 
 class Submissions(Model):
     id = fields.IntField(pk=True)
@@ -37,4 +37,5 @@ class Submissions(Model):
     status = fields.IntField(default=0)
   
     class Meta:
-        table =  f"{__name__}.submissions"
+        table =  "submissions"
+
