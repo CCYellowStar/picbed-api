@@ -6,10 +6,10 @@ https://flask.ccyellowstar.repl.co/
 
 ## 上传接口
 ### path: /upload
-(需求：上传表情包图片，每次接收一张图片(png、gif、jpg等)，同时接收tags(词条，str list), uploader(上传者，str)字段，返回是否成功)
+(需求：上传表情包图片，每次接收多张图片的base64(最多9张)，同时接收tags(词条，str list), uploader(上传者，str)字段，返回是否成功)
 
 #### 参数说明：
-- 图片文件：image (file)
+- 图片文件：base64 (list<str>)
 - 词条列表：tags (list<str>)
 - 上传者：uploader (str)
 

@@ -22,8 +22,8 @@ class Tags(Model):
 
 class EmojiTag(Model):
     id = fields.IntField(pk=True)
-    emoji_id = fields.ForeignKeyField('models.Emojis', related_name='emoji_tag')
-    tag_id = fields.ForeignKeyField('models.Tags', related_name='emoji_tag')
+    emoji = fields.ForeignKeyField('models.Emojis', related_name='emoji_tag')
+    tag = fields.ForeignKeyField('models.Tags', related_name='emoji_tag')
   
     class Meta:
         table =  "emoji_tag"
